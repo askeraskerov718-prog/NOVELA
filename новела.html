@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ПЕРЕУЛОК</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #000; color: #eee;
+  font-family: 'Segoe UI Light', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  overflow: hidden;
+}
+
+#game { position: fixed; inset: 0; }
+
+/* ==== СЦЕНА ==== */
+.vn-scene { position: absolute; inset: 0; overflow: hidden; }
+
+.bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: opacity 1.2s ease, background 1.2s ease;
+}
+
+.rain {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .14;
+  background-image: repeating-linear-gradient(100deg, transparent 0 6px, rgba(200,210,230,.35) 6px 7px);
+  animation: rainFall .5s linear infinite;
+}
+@keyframes rainFall { from{background-position:0 0} to{background-position:40px 80px} }
+
+.vignette {
+  position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.9) 100%);
+}
+
+/* ==== ПЕРСОНАЖ ==== */
+.vn-char {
+  position: absolute; bottom: 180px; left: 50%;
+  transform: translateX(-50%) translateY(40px);
+  height: 62vh; width: auto;
+  opacity: 0; transition: opacity .8s ease, transform .8s ease;
+  z-index: 4; pointer-events: none;
+  filter: drop-shadow(0 0 25px rgba(201,176,55,.35));
+}
+.vn-char.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ==== ДИАЛОГ ==== */
+.vn-box {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  min-height: 180px;
+  background: linear-gradient(to top, rgba(3,3,6,.98), rgba(8,8,14,.92));
+  border-top: 2px solid #c9b037;
+  padding: 22px 40px 30px;
+  z-index: 10;
+  box-shadow: 0 -10px 40px rgba(0,0,0,.9);
+}
+.vn-speaker {
+  color: #c9b037; font-size: 1.05em; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 10px;
+  min-height: 1.2em;
+  text-shadow: 0 0 15px rgba(201,176,55,.5);
+}
+.vn-line {
+  font-size: 1.15em; line-height: 1.7; color: #ddd;
+  min-height: 3.4em; max-width: 900px;
+}
+.vn-line.narration { font-style: italic; color: #aaa; }
+.vn-hint {
+  position: absolute; bottom: 14px; right: 40px;
+  color: #c9b037; font-size: 1.4em;
+  animation: bounce 1.2s infinite; opacity: .8;
+}
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+
+/* ==== ВЫБОР ==== */
+.vn-choices {
+  position: absolute; bottom: 200px; left: 50%;
+  transform: translateX(-50%);
+  width: 90%; max-width: 640px;
+  z-index: 15;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.vn-choice {
+  display: block;
+  background: rgba(8,8,14,.92);
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 16px 24px;
+  font-family: inherit; font-weight: 300;
+  font-size: 1.05em;
+  cursor: pointer;
+  transition: all .3s ease;
+  letter-spacing: 1px;
+  text-align: left;
+}
+.vn-choice:hover {
+  border-color: #c9b037; color: #c9b037;
+  background: rgba(201,176,55,.1);
+  box-shadow: 0 0 25px rgba(201,176,55,.25);
+  transform: translateX(6px);
+}
+
+/* ==== МЕНЮ ==== */
+.nv-menu {
+  position: absolute; inset: 0;
+  display: flex; align-items: center;
+  padding-left: clamp(2rem, 10vw, 9rem);
+  z-index: 5;
+}
+.nv-menu-inner { text-align: left; }
+.nv-logo {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: .18em;
+  color: #c9b037;
+  text-shadow: 0 0 40px rgba(201,176,55,.5);
+  font-weight: 200;
+  margin-bottom: 1.5rem;
+}
+.nv-actions {
+  display: flex; flex-direction: column;
+  align-items: flex-start; gap: .6rem;
+  font-size: clamp(1.12rem, 1.8vw, 1.45rem);
+  letter-spacing: .13em;
+}
+.nv-btn {
+  background: transparent; border: none;
+  border-left: 1px solid transparent;
+  color: #ddd; cursor: pointer;
+  font-family: inherit; font-weight: 200;
+  font-size: inherit; letter-spacing: inherit;
+  padding: .3rem .5rem; margin-left: -.5rem;
+  transition: all .25s ease;
+  text-align: left;
+}
+.nv-btn:hover {
+  color: #fff;
+  transform: translateX(.35rem);
+  border-left-color: rgba(201,176,55,.8);
+  background: linear-gradient(90deg,rgba(201,176,55,.15),transparent 88%);
+  text-shadow: 0 0 8px rgba(255,255,255,.75);
+}
+.nv-shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(0,0,0,.7), rgba(0,0,0,.15) 64%, rgba(0,0,0,.3));
+}
+
+/* ==== НАСТРОЙКИ ==== */
+.nv-settings {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5; padding: 2rem;
+}
+.nv-settings-inner {
+  width: min(30rem, 88vw);
+  padding: 2rem;
+  background: linear-gradient(135deg,rgba(1,3,5,.96),rgba(8,12,15,.91));
+  border: 1px solid rgba(202,220,225,.35);
+  border-left: 2px solid rgba(235,247,249,.75);
+}
+.nv-settings h2 {
+  color: #c9b037; letter-spacing: .24em; font-weight: 200;
+  font-size: 1.4rem; margin-bottom: 1.5rem;
+}
+.nv-setting { margin: 1rem 0; }
+.nv-setting label {
+  display: flex; justify-content: space-between;
+  font-size: 1rem; letter-spacing: .12em;
+  margin-bottom: .6rem;
+}
+.nv-setting input[type=range] {
+  width: 100%; accent-color: #c9b037;
+}
+
+/* ==== ЗАГОЛОВОК ГЛАВЫ ==== */
+.chapter-title {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  text-align: center; z-index: 20;
+  pointer-events: none;
+  animation: appear 1.5s ease forwards;
+}
+@keyframes appear { from{opacity:0} to{opacity:1} }
+.chapter-title h1 {
+  color: #c9b037; font-size: 2.4em; letter-spacing: 6px;
+  text-transform: uppercase; font-weight: 200;
+  text-shadow: 0 0 40px rgba(201,176,55,.6);
+  margin-bottom: 12px;
+}
+.chapter-title p {
+  color: #888; letter-spacing: 8px;
+  font-size: .9em; text-transform: uppercase;
+}
+
+/* ==== ЗВУК ==== */
+.sound-toggle {
+  position: fixed; top: 20px; right: 20px; z-index: 200;
+  background: rgba(8,8,14,.9);
+  border: 1px solid #333; color: #888;
+  width: 50px; height: 50px; border-radius: 50%;
+  cursor: pointer; font-size: 1.3em;
+  transition: all .3s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.sound-toggle:hover {
+  border-color: #c9b037; color: #c9b037;
+  box-shadow: 0 0 20px rgba(201,176,55,.4);
+}
+.sound-toggle.on { border-color: #c9b037; color: #c9b037; }
+
+/* ==== АДАПТИВ ==== */
+@media (max-width: 700px) {
+  .vn-box { padding: 16px 20px 50px; min-height: 150px; }
+  .vn-line { font-size: 1em; }
+  .vn-char { height: 50vh; bottom: 150px; }
+  .chapter-title h1 { font-size: 1.5em; letter-spacing: 3px; }
+  .vn-choices { bottom: 170px; }
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+<button class="sound-toggle" id="soundToggle" title="Включить звук">🔇</button>
+
+<script>
+// ============================================================================
+// ПАССАЖИ (сцены)
+// ============================================================================
+var passages = {
+
+'Menu': `
+<div class="bg" style="background:radial-gradient(ellipse at 60% 40%, #0a0a14 0%, #000 70%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="nv-shade"></div>
+<div class="nv-menu">
+  <div class="nv-menu-inner">
+    <div class="nv-logo">ПЕРЕУЛОК</div>
+    <div class="nv-actions">
+      <button class="nv-btn" data-goto="Пролог">НАЧАТЬ</button>
+      <button class="nv-btn" data-goto="Настройки">НАСТРОЙКИ</button>
+      <button class="nv-btn" data-goto="Альтернативы">АЛЬТЕРНАТИВЫ</button>
+    </div>
+  </div>
+</div>
+`,
+
+'Настройки': `
+<div class="bg" style="background:radial-gradient(ellipse at 60% 40%, #0a0a14 0%, #000 70%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="nv-shade"></div>
+<div class="nv-settings">
+  <div class="nv-settings-inner">
+    <h2>НАСТРОЙКИ</h2>
+    <div class="nv-setting">
+      <label><span>ЗВУК</span><span id="sfxLabel">70%</span></label>
+      <input type="range" min="0" max="1" step="0.01" value="0.7" id="sfxRange">
+    </div>
+    <div class="nv-actions" style="margin-top:2rem;">
+      <button class="nv-btn" data-goto="Menu">НАЗАД</button>
+    </div>
+  </div>
+</div>
+`,
+
+'Пролог': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>ПРОЛОГ</h1><p>ПЕРЕУЛОК</p></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Дождь идёт всегда.</p>
+  <div class="vn-hint">▼</div>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-1">Продолжить</button>
+</div>
+`,
+
+'Переулок-1': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Марк Вейн не помнит, когда он начался. Может, вчера. Может, в прошлую пятницу. Город без названия — на картах обозначен одной буквой, которую Марк каждый раз забывает.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-2">Дальше</button>
+</div>
+`,
+
+'Переулок-2': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Он стоит в переулке за баром «Полуночный блюз». Мокрый асфальт блестит под единственным фонарём, который мигает с ритмом аритмии. Лужи отражают неоновую вывеску — слово BLUES, — и буквы дрожат.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-3">Он прикуривает</button>
+</div>
+`,
+
+'Переулок-3': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-char show">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="100" cy="290" rx="80" ry="15" fill="#0a0a0a" opacity="0.5"/>
+  <path d="M60 280 L60 180 Q60 140 80 120 Q90 110 100 110 Q110 110 120 120 Q140 140 140 180 L140 280 Z" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <ellipse cx="100" cy="95" rx="28" ry="32" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <path d="M70 70 Q100 50 130 70 L125 85 Q100 75 75 85 Z" fill="#0a0a0a" stroke="#c9b037" stroke-width="1"/>
+  <path d="M140 180 Q160 170 165 150" stroke="#c9b037" stroke-width="2" fill="none"/>
+  <circle cx="165" cy="148" r="4" fill="#c9b037"/>
+</svg>
+</div>
+<div class="vn-box">
+  <div class="vn-speaker">Силуэт</div>
+  <p class="vn-line">Марк. Ты опять здесь.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-4">«Опять?»</button>
+</div>
+`,
+
+'Переулок-4': `
+<div class="bg" style="background:#000;"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Вспышка. Звук выстрела сливается с раскатом грома. Марк падает на мокрый асфальт. Последнее, что он видит, — его собственная тень, вытянутая и чёрная, которая медленно отделяется от тела и уходит в темноту переулка.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Цикл-1">Темнота</button>
+</div>
+`,
+
+'Цикл-1': `
+<div class="bg" style="background:radial-gradient(ellipse at 30% 20%, #2a1e0a 0%, #0a0805 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>ЦИКЛ 1</h1><p>ПРОБУЖДЕНИЕ</p></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Марк просыпается за столом в своём офисе. Лоб потный, сердце колотится. Перед ним — пустая пепельница, стакан с остывшим виски и визитка.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Цикл-1-визитка">Взять визитку</button>
+</div>
+`,
+
+'Цикл-1-визитка': `
+<div class="bg" style="background:radial-gradient(ellipse at 30% 20%, #2a1e0a 0%, #0a0805 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line">На визитке — имя: <b style="color:#c9b037;">Эллис Хейвуд</b>. Под именем — адрес: ул. Гринвуд, 17. И строчка от руки: <i>«Найдите мою дочь. Она пропала три дня назад. Я заплачу всё, что угодно.»</i></p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Улица-Гринвуд">Взять плащ и выйти</button>
+</div>
+`,
+
+'Улица-Гринвуд': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 30%, #2a2015 0%, #0a0805 60%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Эллис</div>
+  <p class="vn-line">Вы опять пришли.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Эллис-разговор">«Мы раньше встречались?»</button>
+</div>
+`,
+
+'Эллис-разговор': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 30%, #2a2015 0%, #0a0805 60%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Эллис</div>
+  <p class="vn-line">Простите. Я подумала, что вы... Неважно. Вы — детектив? Мистер Вейн? Проходите.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Комната-Элеоноры">Войти в дом</button>
+</div>
+`,
+
+'Комната-Элеоноры': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 30%, #2a2015 0%, #0a0805 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Маленькая комната с окном в переулок. На столе — Хемингуэй, Чандлер, потрёпанный сборник стихов. На стене — вырезки о пропавших без вести.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Дневник">Открыть ящик стола</button>
+</div>
+`,
+
+'Дневник': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 30%, #2a2015 0%, #0a0805 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Внутри — дневник в кожаной обложке. На первой странице — дата, которая ещё не наступила.</p>
+  <p class="vn-line"><i>«День 14. Марк снова пришёл в бар. Он не помнит меня. Но я вижу, как он смотрит на мой кулон — что-то шевелится в его глазах, будто тень воспоминания. Я не могу ему сказать. Он должен вспомнить сам. Если я скажу, петля замкнётся туже, и он никогда не выберется.»</i></p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Бар">Забрать дневник</button>
+</div>
+`,
+
+'Бар': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 60%, #0a1428 0%, #050810 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-char show">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="100" cy="290" rx="80" ry="15" fill="#0a0a0a" opacity="0.5"/>
+  <path d="M60 280 L60 185 Q60 150 80 130 Q90 120 100 120 Q110 120 120 130 Q140 150 140 185 L140 280 Z" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <ellipse cx="100" cy="100" rx="28" ry="30" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <path d="M72 86 Q100 68 128 86 L125 98 Q100 90 75 98 Z" fill="#0a0a0a" stroke="#c9b037" stroke-width="1"/>
+  <text x="100" y="185" text-anchor="middle" fill="#c9b037" font-size="14" font-family="Georgia" opacity="0.7">23.10</text>
+</svg>
+</div>
+<div class="vn-box">
+  <div class="vn-speaker">Бармен</div>
+  <p class="vn-line">Что налить?</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Бармен-разговор">«Я ищу Элеонору Хейвуд»</button>
+</div>
+`,
+
+'Бармен-разговор': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 60%, #0a1428 0%, #050810 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Бармен</div>
+  <p class="vn-line">Её мать ошиблась. Здесь нет друзей. Только клиенты. Налейте себе виски и идите домой, детектив. Здесь нечего искать.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-повтор">Выйти через заднюю дверь</button>
+</div>
+`,
+
+'Переулок-повтор': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Дождь усилился. На стене дома мелом написано одно слово — «ВЕЙН».</p>
+  <p class="vn-line narration">Шаги за спиной. Марк оборачивается. Силуэт в конце переулка. Поднимает руку.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Цикл-2">Вспышка</button>
+</div>
+`,
+
+'Цикл-2': `
+<div class="bg" style="background:radial-gradient(ellipse at 30% 20%, #2a1e0a 0%, #0a0805 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>ЦИКЛ 2</h1><p>ДЕЖАВЮ</p></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Марк просыпается за столом. Визитка Эллис Хейвуд. Пепельница. Остывший виски. Но на столе — блокнот, и в нём его почерком написано: <i>«Джо, бармен. Кулон — сова. Татуировка — 23.10. Силуэт стреляет.»</i></p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Эллис-правда">Снова к Эллис</button>
+</div>
+`,
+
+'Эллис-правда': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 30%, #2a2015 0%, #0a0805 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Эллис</div>
+  <p class="vn-line">Вы приходите каждый день. Иногда — дважды. Вы задаёте те же вопросы. Вы не помните?</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Дом-23">Посмотреть дневник ещё раз</button>
+</div>
+`,
+
+'Дом-23': `
+<div class="bg" style="background:radial-gradient(ellipse at 70% 25%, #2a1e0a 0%, #08080c 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Заброшенный доходный дом. Дверь на третьем этаже выглядит новой. За ней — свет. На столе — фотографии. На них — Марк. Снят со стороны. На последней — он лежит на мокром асфальте.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Тень-разговор">«Ты понимаешь теперь?»</button>
+</div>
+`,
+
+'Тень-разговор': `
+<div class="bg" style="background:radial-gradient(ellipse at 70% 25%, #2a1e0a 0%, #08080c 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-char show">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="100" cy="290" rx="80" ry="15" fill="#0a0a0a" opacity="0.5"/>
+  <path d="M55 280 L60 170 Q65 135 85 115 Q95 105 100 105 Q105 105 115 115 Q135 135 140 170 L145 280 Z" fill="#08080a" stroke="#c9b037" stroke-width="2"/>
+  <ellipse cx="100" cy="95" rx="28" ry="34" fill="#08080a" stroke="#c9b037" stroke-width="2"/>
+  <path d="M70 75 Q100 52 130 75 L126 92 Q100 82 74 92 Z" fill="#050505" stroke="#c9b037" stroke-width="1.5"/>
+  <circle cx="88" cy="98" r="2" fill="#c9b037" opacity="0.9"/>
+  <circle cx="112" cy="98" r="2" fill="#c9b037" opacity="0.9"/>
+</svg>
+</div>
+<div class="vn-box">
+  <div class="vn-speaker">Тень Марка</div>
+  <p class="vn-line">Элеонора не пропала. Ты её спрятал. В подвале этого дома. Каждый цикл петля стирает твою память, и ты забываешь, где она.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Признание-тени">«Что я сделал?»</button>
+</div>
+`,
+
+'Признание-тени': `
+<div class="bg" style="background:radial-gradient(ellipse at 70% 25%, #2a1e0a 0%, #08080c 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Тень Марка</div>
+  <p class="vn-line">Пять лет назад. Река. Виктор Хейвуд. Он упал с моста и просил помощи. Ты не протянул руку. Элеонора видела это из окна машины.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Подвал">Спуститься в подвал</button>
+</div>
+`,
+
+'Подвал': `
+<div class="bg" style="background:radial-gradient(ellipse at 70% 25%, #2a1e0a 0%, #08080c 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-char show">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="100" cy="290" rx="70" ry="12" fill="#0a0a0a" opacity="0.5"/>
+  <path d="M70 280 L70 200 Q70 165 90 145 Q100 135 105 135 Q110 135 120 145 Q140 165 140 200 L140 280 Z" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <ellipse cx="105" cy="115" rx="24" ry="28" fill="#1a1a1a" stroke="#c9b037" stroke-width="1.5"/>
+  <path d="M78 100 Q105 80 132 100 L128 115 Q105 102 82 115 Z" fill="#0a0a0a" stroke="#c9b037" stroke-width="1"/>
+  <circle cx="105" cy="155" r="4" fill="#c9b037" opacity="0.8"/>
+  <path d="M98 155 L112 155 L105 165 Z" fill="#c9b037" opacity="0.6"/>
+</svg>
+</div>
+<div class="vn-box">
+  <div class="vn-speaker">Элеонора</div>
+  <p class="vn-line">Марк. Ты снова пришёл. Я знаю — ты никогда не помнишь. Каждый раз ты находишь меня, обещаешь всё исправить, и каждый раз кто-то стреляет тебе в спину.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Кто-стреляет">«Кто стреляет?»</button>
+</div>
+`,
+
+'Кто-стреляет': `
+<div class="bg" style="background:radial-gradient(ellipse at 70% 25%, #2a1e0a 0%, #08080c 60%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Элеонора</div>
+  <p class="vn-line">Ты. Твоя тень. Та часть тебя, которая не хочет вспоминать. Она убивает тебя, чтобы стереть память. Чтобы тебе не пришлось признаваться.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Переулок-финал">Выйти в переулок</button>
+</div>
+`,
+
+'Переулок-финал': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-char show">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <path d="M55 280 L60 170 Q65 135 85 115 Q95 105 100 105 Q105 105 115 115 Q135 135 140 170 L145 280 Z" fill="#08080a" stroke="#c9b037" stroke-width="2"/>
+  <ellipse cx="100" cy="95" rx="28" ry="34" fill="#08080a" stroke="#c9b037" stroke-width="2"/>
+  <circle cx="88" cy="98" r="2" fill="#c9b037" opacity="0.9"/>
+  <circle cx="112" cy="98" r="2" fill="#c9b037" opacity="0.9"/>
+</svg>
+</div>
+<div class="vn-box">
+  <div class="vn-speaker">Марк</div>
+  <p class="vn-line">Я знаю, кто ты. Ты — я. Если ты выстрелишь, завтра я снова проснусь и снова найду её. И послезавтра. Ты не сможешь вечно.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Признание">Тень опускает руку</button>
+</div>
+`,
+
+'Признание': `
+<div class="bg" style="background:radial-gradient(ellipse at 30% 20%, #2a1e0a 0%, #0a0805 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>ЦИКЛ 3</h1><p>ПРИЗНАНИЕ</p></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Марк просыпается. Он встаёт. Не берёт пистолет. Он идёт в полицейский участок.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Участок">Войти в участок</button>
+</div>
+`,
+
+'Участок': `
+<div class="bg" style="background:radial-gradient(ellipse at 30% 20%, #2a1e0a 0%, #0a0805 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Марк</div>
+  <p class="vn-line">Пять лет назад. Виктор Хейвуд. Утонул в реке. Дело закрыли как несчастный случай. Это не был несчастный случай. Я стоял на мосту и смотрел. И ещё: Элеонора Хейвуд, его дочь, не пропала. Она в доме 10 на 23-й улице, в подвале. Я запер её там три года назад.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Свобода">Моррисон снимает трубку</button>
+</div>
+`,
+
+'Свобода': `
+<div class="bg" style="background:linear-gradient(180deg, #3a3020 0%, #1a1510 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Дождь прекращается. Впервые за все циклы Марк видит солнце. Оно слабое, бледное, как больничная лампа, но оно есть.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Эпилог">Эпилог</button>
+</div>
+`,
+
+'Эпилог': `
+<div class="bg" style="background:linear-gradient(180deg, #1a1a1a 0%, #050505 100%);"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>ЭПИЛОГ</h1><p>ПОСЛЕДНЯЯ ТЕНЬ</p></div>
+<div class="vn-box">
+  <div class="vn-speaker"></div>
+  <p class="vn-line narration">Тюремная камера. Марк сидит на койке. За окном — дождь. Но тихий, спокойный, обыкновенный дождь, который просто идёт и не значит ничего.</p>
+  <p class="vn-line"><i>«Я не помню, сколько раз прожил этот день. Но я помню, что в этот раз не сбежал. Элеонора свободна. Эллис знает правду. Город больше не голоден. Тень ушла. Я остался. И это — впервые не наказание.»</i></p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Menu">Впервые — он спит без снов</button>
+</div>
+`,
+
+'Альтернативы': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 50%, #0a0a14 0%, #000 70%);"></div>
+<div class="vignette"></div>
+<div class="chapter-title"><h1>АЛЬТЕРНАТИВЫ</h1><p>ДРУГИЕ КОНЦОВКИ</p></div>
+<div class="vn-choices" style="bottom:80px;">
+  <button class="vn-choice" data-goto="Вечный-детектив">«Вечный детектив»</button>
+  <button class="vn-choice" data-goto="Безумие">«Безумие»</button>
+  <button class="vn-choice" data-goto="Menu">В меню</button>
+</div>
+`,
+
+'Вечный-детектив': `
+<div class="bg" style="background:linear-gradient(180deg, #0a0a12 0%, #000 100%);"></div>
+<div class="rain"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Вечный детектив</div>
+  <p class="vn-line narration">Марк проходит цикл за циклом, но не идёт на 23-ю улицу. Каждую ночь он умирает в переулке. Пройдёт сто, двести, пятьсот циклов. Марк станет частью города: его силуэт будут видеть в переулках, его тень — на мокром асфальте.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Menu">В меню</button>
+</div>
+`,
+
+'Безумие': `
+<div class="bg" style="background:radial-gradient(ellipse at 50% 60%, #0a1428 0%, #050810 50%, #000 100%);"></div>
+<div class="vignette"></div>
+<div class="vn-box">
+  <div class="vn-speaker">Безумие</div>
+  <p class="vn-line narration">Марк перестаёт видеть петлю. Он продолжает «расследование» — но это уже не расследование, а ритуал. Город медленно гаснет. Остаётся только бар «Полуночный блюз», одинокий, как маяк в мёртвом море. И Марк внутри — с виски, с сигаретой, с улыбкой человека, который забыл, зачем пришёл, и которому больше всё равно.</p>
+</div>
+<div class="vn-choices">
+  <button class="vn-choice" data-goto="Menu">В меню</button>
+</div>
+`
+};
+
+// ============================================================================
+// ЗВУКОВОЙ ДВИЖОК (Web Audio API)
+// ============================================================================
+var audioCtx = null;
+var soundOn = false;
+var sfxVolume = 0.7;
+var rainNode = null, rainGain = null, jazzTimer = null;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function startAmbient() {
+  if (!audioCtx || rainNode) return;
+  var size = 2 * audioCtx.sampleRate;
+  var buf = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+  var data = buf.getChannelData(0);
+  for (var i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  rainNode = audioCtx.createBufferSource();
+  rainNode.buffer = buf; rainNode.loop = true;
+  var f = audioCtx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6;
+  rainGain = audioCtx.createGain(); rainGain.gain.value = 0.035 * sfxVolume;
+  rainNode.connect(f); f.connect(rainGain); rainGain.connect(audioCtx.destination);
+  rainNode.start();
+  scheduleJazz();
+}
+
+function stopAmbient() {
+  if (rainNode) { try { rainNode.stop(); } catch(e){} rainNode = null; }
+  if (jazzTimer) { clearTimeout(jazzTimer); jazzTimer = null; }
+}
+
+var jazzNotes = [220, 247, 262, 294, 330, 349, 392, 440];
+function scheduleJazz() {
+  if (!soundOn || !audioCtx) return;
+  jazzTimer = setTimeout(function() {
+    if (!soundOn) return;
+    var now = audioCtx.currentTime;
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
+    o.type = 'sawtooth';
+    o.frequency.value = jazzNotes[Math.floor(Math.random()*jazzNotes.length)];
+    f.type = 'lowpass'; f.frequency.value = 1100; f.Q.value = 2;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.022 * sfxVolume, now + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
+    o.connect(f); f.connect(g); g.connect(audioCtx.destination);
+    o.start(now); o.stop(now + 1.7);
+    scheduleJazz();
+  }, 3500 + Math.random() * 5000);
+}
+
+function playGunshot() {
+  if (!audioCtx || !soundOn) return;
+  var now = audioCtx.currentTime;
+  var size = audioCtx.sampleRate * 0.3;
+  var buf = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+  var d = buf.getChannelData(0);
+  for (var i = 0; i < size; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/size, 3);
+  var n = audioCtx.createBufferSource(); n.buffer = buf;
+  var f = audioCtx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(3000, now); f.frequency.exponentialRampToValueAtTime(100, now+0.3);
+  var g = audioCtx.createGain(); g.gain.setValueAtTime(0.5 * sfxVolume, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now+0.3);
+  n.connect(f); f.connect(g); g.connect(audioCtx.destination); n.start(now);
+  var o = audioCtx.createOscillator(), og = audioCtx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(120, now);
+  o.frequency.exponentialRampToValueAtTime(40, now+0.2);
+  og.gain.setValueAtTime(0.4 * sfxVolume, now);
+  og.gain.exponentialRampToValueAtTime(0.001, now+0.25);
+  o.connect(og); og.connect(audioCtx.destination); o.start(now); o.stop(now+0.3);
+}
+
+function playThunder() {
+  if (!audioCtx || !soundOn) return;
+  var now = audioCtx.currentTime;
+  var size = audioCtx.sampleRate * 2;
+  var buf = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+  var d = buf.getChannelData(0);
+  for (var i = 0; i < size; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/size, 1.5);
+  var n = audioCtx.createBufferSource(); n.buffer = buf;
+  var f = audioCtx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(200, now); f.frequency.exponentialRampToValueAtTime(60, now+1.5);
+  var g = audioCtx.createGain(); g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.14 * sfxVolume, now+0.1);
+  g.gain.exponentialRampToValueAtTime(0.001, now+2);
+  n.connect(f); f.connect(g); g.connect(audioCtx.destination); n.start(now);
+}
+
+function playFootsteps(count) {
+  if (!audioCtx || !soundOn) return;
+  count = count || 4;
+  for (var i = 0; i < count; i++) {
+    (function(i){
+      var t = audioCtx.currentTime + i * 0.35;
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
+      o.type = 'sine'; o.frequency.setValueAtTime(80, t);
+      o.frequency.exponentialRampToValueAtTime(40, t+0.1);
+      f.type = 'lowpass'; f.frequency.value = 200;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08 * sfxVolume, t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t+0.15);
+      o.connect(f); f.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+0.2);
+    })(i);
+  }
+}
+
+function playDoor() {
+  if (!audioCtx || !soundOn) return;
+  var now = audioCtx.currentTime;
+  var o = audioCtx.createOscillator(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(200, now);
+  o.frequency.linearRampToValueAtTime(350, now+0.4);
+  o.frequency.linearRampToValueAtTime(250, now+0.8);
+  g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.03 * sfxVolume, now+0.1);
+  g.gain.exponentialRampToValueAtTime(0.001, now+0.9);
+  f.type = 'bandpass'; f.frequency.value = 600; f.Q.value = 5;
+  o.connect(f); f.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+1);
+}
+
+function playDawn() {
+  if (!audioCtx || !soundOn) return;
+  var notes = [262, 330, 392, 523];
+  notes.forEach(function(freq, i) {
+    var now = audioCtx.currentTime + i*0.15;
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.04 * sfxVolume, now+0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, now+1.5);
+    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+1.6);
+  });
+}
+
+function playDark() {
+  if (!audioCtx || !soundOn) return;
+  var now = audioCtx.currentTime;
+  var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(60, now);
+  o.frequency.exponentialRampToValueAtTime(30, now+1.5);
+  g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.1 * sfxVolume, now+0.3);
+  g.gain.exponentialRampToValueAtTime(0.001, now+2);
+  o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+2);
+}
+
+// ============================================================================
+// ПЕРЕХОДЫ И ЗВУКОВЫЕ ТРИГГЕРЫ
+// ============================================================================
+function triggerSounds(name) {
+  if (!soundOn) return;
+  if (name === 'Пролог' || name === 'Переулок-1' || name === 'Переулок-2') startAmbient();
+  if (name === 'Переулок-3') playFootsteps(4);
+  if (name === 'Переулок-4') { playGunshot(); setTimeout(playThunder, 100); }
+  if (name === 'Переулок-повтор') { playFootsteps(4); setTimeout(playGunshot, 1500); }
+  if (name === 'Улица-Гринвуд' || name === 'Эллис-правда') playDoor();
+  if (name === 'Бар' || name === 'Бармен-разговор') startAmbient();
+  if (name === 'Свобода' || name === 'Эпилог') { playDawn(); stopAmbient(); }
+  if (name === 'Вечный-детектив' || name === 'Безумие') { playDark(); }
+  if (name === 'Menu') stopAmbient();
+}
+
+function showPassage(name) {
+  var container = document.getElementById('game');
+  if (!passages[name]) {
+    container.innerHTML = '<div style="padding:50px;color:#fff;">Пассаж не найден: ' + name + '</div>';
+    return;
+  }
+  container.innerHTML = passages[name];
+
+  // Навешиваем обработчики на все кнопки с data-goto
+  container.querySelectorAll('[data-goto]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!audioCtx) initAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      showPassage(this.getAttribute('data-goto'));
+    });
+  });
+
+  // Заголовок главы — исчезает через 3 сек
+  var titleDiv = container.querySelector('.chapter-title');
+  if (titleDiv) {
+    setTimeout(function(){
+      titleDiv.style.transition = 'opacity 1s ease';
+      titleDiv.style.opacity = '0';
+    }, 2500);
+  }
+
+  // Настройки — обработчик ползунка
+  var sfxRange = container.querySelector('#sfxRange');
+  var sfxLabel = container.querySelector('#sfxLabel');
+  if (sfxRange) {
+    sfxRange.value = sfxVolume;
+    sfxLabel.textContent = Math.round(sfxVolume * 100) + '%';
+    sfxRange.addEventListener('input', function() {
+      sfxVolume = parseFloat(this.value);
+      sfxLabel.textContent = Math.round(sfxVolume * 100) + '%';
+      if (rainGain) rainGain.gain.value = 0.035 * sfxVolume;
+    });
+  }
+
+  triggerSounds(name);
+}
+
+// ============================================================================
+// КНОПКА ЗВУКА
+// ============================================================================
+document.getElementById('soundToggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  initAudio();
+  soundOn = !soundOn;
+  if (soundOn) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    this.innerHTML = '🔊';
+    this.classList.add('on');
+    startAmbient();
+  } else {
+    this.innerHTML = '🔇';
+    this.classList.remove('on');
+    stopAmbient();
+  }
+});
+
+// Активируем аудио при первом клике
+document.addEventListener('click', function() {
+  if (!audioCtx) initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}, { once: false });
+
+// ============================================================================
+// СТАРТ
+// ============================================================================
+showPassage('Menu');
+</script>
+</body>
+</html>
